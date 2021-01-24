@@ -31,6 +31,7 @@ struct threadData
     boolean child = false; // Is this thread a child thread
 };
 
+// Summation function called on all leaf threads
 void* summation(void* input)
 {
     struct threadData *data;
@@ -44,18 +45,12 @@ void* summation(void* input)
     {
         finalAmt += i;
     }
-
     *finalTotalAmt += finalAmt;
 
-    if(data->child)
-    {
-    cout <<"This thread is a grand child--"<< "Child thread number "<<" start= "<<data->startPnt<<" end= "<<data->startPnt + data->base<<" sum= "<<finalAmt<<endl;
-    }
-    else
-    {
-    //  printf("Child thread number %d:\t start=%lld\t end=%lld \t sum=%lld \n",pthread_self(),data->startPnt,data->startPnt + data->base,finalAmt);
-    cout << "Child thread number "<<" start= "<<data->startPnt<<" end= "<<data->startPnt + data->base<<" sum= "<<finalAmt<<endl;
-    }
+    // Output to file
+    pthread_t theId = pthread_self();
+    printf("Child Thread Number %lld:\t",pthread_self());
+    printf("start=%lld\t end=%lld\t sum=%lld\n",data->startPnt,data->startPnt + data->base,finalAmt);
     return NULL;
 }
 
@@ -63,6 +58,8 @@ void* makeGrandChildren(void* input)
 {
     struct parentThreadData* grandThread;
 	grandThread = (struct parentThreadData * ) input;
+    long long grandParentTotal = 0;
+    long long* grand_ptr = &grandParentTotal;
 
    // Calculating values for thread
         long long rem = grandThread->threadRange % grandThread->amtOfChildren;
@@ -75,9 +72,10 @@ void* makeGrandChildren(void* input)
             // Creating struct thread data type and adding data to it for each thread
             threadData td;
             td.child=true;
-            td.output = grandThread->output;
+            td.output = grand_ptr;
             td.base = baseValue-1;
             startPoint += 1;
+            long long savePnt = startPoint;
             td.startPnt = startPoint;
             startPoint += baseValue-1;
 
@@ -98,7 +96,17 @@ void* makeGrandChildren(void* input)
 
             pthread_create(&thread_id,&attr, summation, &td);
             pthread_join(thread_id,NULL);
+
+            
+
+            // Printing output
+            pthread_t theId = pthread_self();
+            printf("Child Thread Number %lld:\t",thread_id);
+            printf("GrandChild Thread Number %lld:\t",theId);
+            printf("grandchild start=%lld \t grandchildend = %lld \t grand childsum = %lld\n",savePnt,startPoint,grandParentTotal);
         }
+
+        *(grandThread->output) += grandParentTotal;
         
         return NULL;
 }
@@ -131,24 +139,22 @@ int main (int argc, char **argv)
     if(grandChildren > 0)
     {
         long long rem = total%children;
-        cout << rem << endl;
         long long baseRange = ((total-rem)/children);
-        cout << baseRange << endl;
 
         long long startPoint = 0;
         for(long long i = 0; i < children; i++){
             // Creating struct parent thread data type
-            parentThreadData td;
-            td.output = sum_ptr; 
-            td.amtOfChildren = grandChildren;
-            td.threadRange = baseRange;
+            parentThreadData pd;
+            pd.output = sum_ptr; 
+            pd.amtOfChildren = grandChildren;
+            pd.threadRange = baseRange;
             startPoint += 1;
-            td.startPnt = startPoint;
+            pd.startPnt = startPoint;
             startPoint += baseRange-1;
 
             if (rem > 0){
                 startPoint += 1;
-                td.threadRange += 1;
+                pd.threadRange += 1;
                 rem--;
             }
            
@@ -159,7 +165,7 @@ int main (int argc, char **argv)
             pthread_attr_t attr;
             pthread_attr_init(&attr);
 
-            pthread_create(&thread_id,&attr, makeGrandChildren, &td);
+            pthread_create(&thread_id,&attr, makeGrandChildren, &pd);
             pthread_join(thread_id,NULL);
         }
     }
